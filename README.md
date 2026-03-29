@@ -1,7 +1,9 @@
-# WebAssignment02
+# WebAssignment02 -- ROOMSYNC
 
 > A smart roommate and room-finding platform built for BSCS Web Engineering Assignment 02.
- 
+> 
+ <img width="600" height="450" alt="rs-temp-logo" src="https://github.com/user-attachments/assets/820bf323-79a9-48fb-a717-76de55d04410" />
+
 ---
  
 ## 🔗 Links
