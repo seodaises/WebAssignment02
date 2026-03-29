@@ -5,8 +5,8 @@
 ---
  
 ## 🔗 Links
-- **Live Demo:** https://khawla.github.io/roomsync/
-- **GitHub Repository:** https://github.com/khawla/roomsync
+- **Live Demo:** https://seodaises.github.io/WebAssignment02/
+- **GitHub Repository:** https://github.com/seodaises/WebAssignment02
  
 ---
  
