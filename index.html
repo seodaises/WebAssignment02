@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoomSync</title>
+    <link rel="icon" type="image/x-icon" href="assets/images/rs-temp-logo.png">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <script>
+const THEME_KEY = `roomsync-theme`;
+
+const applyTheme = (theme) => {
+  document.documentElement.classList.toggle(`dark`, theme === `dark`);
+  localStorage.setItem(THEME_KEY, theme);
+  const btn = document.getElementById(`themeBtn`);
+  if (btn) btn.textContent = theme === `dark` ? `☀️` : `🌙`;
+};
+ 
+const initTheme = () => {
+  const saved = localStorage.getItem(THEME_KEY) || `light`;
+  applyTheme(saved);
+};
+
+const toggleTheme = () => {
+  const current = localStorage.getItem(THEME_KEY) || `light`;
+  applyTheme(current === `dark` ? `light` : `dark`);
+};
+    </script>
+    <script>
+const roomsDB = [
+  { id: 1, title: `Cozy Studio`,       city: `Lahore`,     rent: 18000, type: `Studio`,  verified: true,  rating: 4.8, createdAt: `2026-01-10` },
+  { id: 2, title: `Shared Flat`,        city: `Karachi`,    rent: 12000, type: `Shared`,  verified: true,  rating: 4.2, createdAt: `2026-01-15` },
+  { id: 3, title: `Private Room`,       city: `Islamabad`,  rent: 25000, type: `Private`, verified: false, rating: 3.9, createdAt: `2026-02-01` },
+  { id: 4, title: `Budget Room`,        city: `Rawalpindi`, rent: 8000,  type: `Shared`,  verified: true,  rating: 4.0, createdAt: `2026-02-10` },
+  { id: 5, title: `Luxury Apartment`,   city: `Lahore`,     rent: 45000, type: `Studio`,  verified: true,  rating: 4.9, createdAt: `2026-02-20` },
+  { id: 6, title: `Girls Hostel Room`,  city: `Faisalabad`, rent: 6000,  type: `Shared`,  verified: false, rating: 3.5, createdAt: `2026-03-01` },
+  { id: 7, title: `Model Town Flat`,    city: `Lahore`,     rent: 22000, type: `Private`, verified: true,  rating: 4.5, createdAt: `2026-03-10` },
+  { id: 8, title: `G-11 Apartment`,     city: `Islamabad`,  rent: 35000, type: `Studio`,  verified: true,  rating: 4.7, createdAt: `2026-03-15` },
+];
+
+let nextId       = 9;
+    </script>
+    <script>
+let rooms        = [...roomsDB];
+let editingId    = null;
+let activeFilter = `all`;
+
+
+const formatCity     = (city)    => city.toUpperCase();
+const normalizeStr   = (str)     => str.toLowerCase().trim();
+const matchSearch    = (room, q) => room.title.toLowerCase().includes(q)
+                                 || room.city.toLowerCase().includes(q);
+const cityStarts     = (city, p) => city.startsWith(p);
+const cleanRent      = (val)     => val.replace(/[^0-9]/g, ``);
+const formatDate     = (date)    => date.split(`-`).reverse().join(`/`);
+const truncateTitle  = (title)   => title.length > 20 ? title.slice(0, 20) + `…` : title;
+const padRent        = (rent)    => String(rent).padStart(6, ` `);
+const capitalizeType = (type)    => type.charAt(0).toUpperCase() + type.slice(1);
+
+const getTotalRent  = (arr) => arr.reduce((sum, r) => sum + r.rent, 0);
+const getAvgRating  = (arr) => arr.length
+  ? (arr.reduce((s, r) => s + r.rating, 0) / arr.length).toFixed(1)
+  : `0`;
+const findById      = (id)  => rooms.find(r => r.id === id);
+const allVerified   = (arr) => arr.every(r => r.verified);
+const anyBudget     = (arr) => arr.some(r => r.rent < 10000);
+const hasCityIn     = (arr, city) => arr.map(r => r.city).includes(city);
+const cheapest      = (arr) => [...arr].sort((a, b) => a.rent - b.rent)[0];
+
+const getRoomKeys    = (room) => Object.keys(room);
+const getRoomValues  = (room) => Object.values(room);
+const getRoomEntries = (room) => Object.entries(room);
+const cloneRoom      = (room) => Object.assign({}, room);
+const dropProp       = (room, prop) => {
+  const clone = cloneRoom(room);
+  delete clone[prop];
+  return clone;
+};
+
+function renderCards(data) {
+                const grid = document.getElementById('cardsGrid');
+                const empty = document.getElementById('emptyState');
+                const count = document.getElementById('resultsCount');
+
+                if (data.length === 0) {
+                    grid.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    count.textContent = 'No listings found.';
+                    return;
+                }
+
+                empty.classList.add('hidden');
+                count.textContent = `Showing ${data.length} listing${data.length !== 1 ? 's' : ''}`;
+
+                grid.innerHTML = data.map(room => `
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-md hover:-translate-y-1 hover:shadow-xl transition duration-300 overflow-hidden border border-gray-100 dark:border-gray-800">
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 h-24 flex items-center justify-center text-4xl">
+                ${room.type === 'Shared' ? '👥' : room.type === 'Private' ? '🔒' : '🏢'}
+            </div>
+            <div class="p-5">
+                <div class="flex items-start justify-between mb-2">
+                    <h3 class="font-bold text-base">${room.title}</h3>
+                    ${room.verified
+                        ? `<span class="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 font-semibold px-2 py-0.5 rounded-full">✅ Verified</span>`
+                        : `<span class="text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 font-semibold px-2 py-0.5 rounded-full">⏳ Pending</span>`}
+                </div>
+                <p class="text-gray-500 text-sm mb-1">📍 ${room.city}</p>
+                <p class="text-gray-500 text-sm mb-1">🏠 ${room.type}</p>
+                <p class="text-blue-600 font-bold text-lg mb-4">PKR ${room.rent.toLocaleString()} <span class="text-gray-400 font-normal text-sm">/month</span></p>
+                <div class="flex gap-2">
+                    <button onclick="openEdit(${room.id})"
+                        class="flex-1 py-2 text-sm font-semibold bg-blue-50 dark:bg-blue-950 text-blue-600 rounded-xl hover:bg-blue-100 transition">
+                        ✏️ Edit
+                    </button>
+                    <button onclick="deleteRoom(${room.id})"
+                        class="flex-1 py-2 text-sm font-semibold bg-red-50 dark:bg-red-950 text-red-500 rounded-xl hover:bg-red-100 transition">
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+            }
+            function setFilter(filter) {
+                activeFilter = filter;
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                    btn.classList.add('border-gray-300', 'dark:border-gray-700');
+                });
+                const active = document.getElementById('f-' + filter);
+                active.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                active.classList.remove('border-gray-300', 'dark:border-gray-700');
+                applyFilters();
+            }
+
+            function applyFilters() {
+                const query = document.getElementById('searchBar').value.toLowerCase();
+                let filtered = rooms.filter(room => {
+                    const matchSearch = room.title.toLowerCase().includes(query) ||
+                        room.city.toLowerCase().includes(query);
+                    let matchFilter = true;
+                    if (activeFilter === 'verified') matchFilter = room.verified === true;
+                    else if (activeFilter === 'shared') matchFilter = room.type === 'Shared';
+                    else if (activeFilter === 'private') matchFilter = room.type === 'Private';
+                    else if (activeFilter === 'studio') matchFilter = room.type === 'Studio';
+                    else if (activeFilter === 'budget') matchFilter = room.rent < 15000;
+                    return matchSearch && matchFilter;
+                });
+                renderCards(filtered);
+            }
+
+
+            function addRoom() {
+                const title = document.getElementById('addTitle').value.trim();
+                const city = document.getElementById('addCity').value;
+                const rent = parseInt(document.getElementById('addRent').value);
+                const type = document.getElementById('addType').value;
+                const verified = document.getElementById('addVerified').checked;
+
+                if (!title || !city || !rent || !type) {
+                    document.getElementById('addError').classList.remove('hidden');
+                    return;
+                }
+                document.getElementById('addError').classList.add('hidden');
+
+                rooms.push({ id: nextId++, title, city, rent, type, verified });
+
+                // Reset form
+                document.getElementById('addTitle').value = '';
+                document.getElementById('addCity').value = '';
+                document.getElementById('addRent').value = '';
+                document.getElementById('addType').value = '';
+                document.getElementById('addVerified').checked = false;
+
+                applyFilters();
+                renderControlStructures();
+            }
+
+
+            function deleteRoom(id) {
+                rooms = rooms.filter(r => r.id !== id);
+                applyFilters();
+                renderControlStructures();
+            }
+
+
+            function openEdit(id) {
+                const room = rooms.find(r => r.id === id);
+                if (!room) return;
+                editingId = id;
+                document.getElementById('editTitle').value = room.title;
+                document.getElementById('editCity').value = room.city;
+                document.getElementById('editRent').value = room.rent;
+                document.getElementById('editType').value = room.type;
+                document.getElementById('editVerified').checked = room.verified;
+                document.getElementById('editModal').classList.remove('hidden');
+            }
+
+            function updateRoom() {
+                const idx = rooms.findIndex(r => r.id === editingId);
+                if (idx === -1) return;
+                rooms[idx].title = document.getElementById('editTitle').value.trim();
+                rooms[idx].city = document.getElementById('editCity').value;
+                rooms[idx].rent = parseInt(document.getElementById('editRent').value);
+                rooms[idx].type = document.getElementById('editType').value;
+                rooms[idx].verified = document.getElementById('editVerified').checked;
+                closeModal();
+                applyFilters();
+                renderControlStructures();
+            }
+
+            function closeModal() {
+                document.getElementById('editModal').classList.add('hidden');
+                editingId = null;
+            }
+
+const renderObjectPanel = () => {
+  const panel = document.getElementById(`objectPanel`);
+  if (!panel || !rooms.length) return;
+
+  const s       = rooms[0];
+  const keys    = getRoomKeys(s);
+  const values  = getRoomValues(s);
+  const entries = getRoomEntries(s);
+  const cloned  = cloneRoom(s);
+  const stripped = dropProp(s, `createdAt`);
+
+  panel.innerHTML = `
+    <div class="obj-section">
+      <p class="obj-label">Object.keys(rooms[0])</p>
+      <p class="obj-value">[${keys.map(k => `"${k}"`).join(`, `)}]</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">Object.values(rooms[0])</p>
+      <p class="obj-value">[${values.map(v => `"${v}"`).join(`, `)}]</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">Object.entries(rooms[0]) — first 3</p>
+      <p class="obj-value">${entries.slice(0, 3).map(([k, v]) => `${k}: "${v}"`).join(` | `)}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">Object.assign({}, rooms[0]) — cloned title</p>
+      <p class="obj-value">"${cloned.title}"</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">delete clone.createdAt — keys after delete</p>
+      <p class="obj-value">[${Object.keys(stripped).map(k => `"${k}"`).join(`, `)}]</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">map().includes("Lahore")</p>
+      <p class="obj-value">${hasCityIn(rooms, `Lahore`)} — Lahore listings exist</p>
+    </div>
+  `;
+};
+
+const renderArrayPanel = () => {
+  const panel = document.getElementById(`arrayPanel`);
+  if (!panel) return;
+
+  const cheap = cheapest(rooms);
+  const found = rooms.find(r => r.verified);
+
+  panel.innerHTML = `
+    <div class="obj-section">
+      <p class="obj-label">reduce() — Total Rent</p>
+      <p class="obj-value">PKR ${getTotalRent(rooms).toLocaleString()}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">find() — First verified listing</p>
+      <p class="obj-value">${found ? `"${found.title}" — PKR ${found.rent.toLocaleString()}` : `None found`}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">every() — All rooms verified?</p>
+      <p class="obj-value">${allVerified(rooms)} — ${allVerified(rooms) ? `All verified` : `Some unverified`}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">some() — Any room under PKR 10,000?</p>
+      <p class="obj-value">${anyBudget(rooms)} — ${anyBudget(rooms) ? `Budget options exist` : `None`}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">map() + includes() — Has Lahore?</p>
+      <p class="obj-value">${hasCityIn(rooms, `Lahore`)} — Lahore listings ${hasCityIn(rooms, `Lahore`) ? `exist` : `not found`}</p>
+    </div>
+    <div class="obj-section">
+      <p class="obj-label">sort() — Cheapest room</p>
+      <p class="obj-value">${cheap ? `"${cheap.title}" @ PKR ${cheap.rent.toLocaleString()}` : `—`}</p>
+    </div>
+  `;
+};
+
+const renderStringPanel = () => {
+  const panel = document.getElementById(`stringPanel`);
+  if (!panel || !rooms.length) return;
+  const r = rooms[0];
+  panel.innerHTML = `
+    <div class="obj-section"><p class="obj-label">1. toUpperCase() — city label</p><p class="obj-value">"${r.city}" → "${r.city.toUpperCase()}"</p></div>
+    <div class="obj-section"><p class="obj-label">2. toLowerCase() — search normalize</p><p class="obj-value">"${r.title}" → "${r.title.toLowerCase()}"</p></div>
+    <div class="obj-section"><p class="obj-label">3. trim() — clean input</p><p class="obj-value">"  cozy studio  ".trim() → "${`  cozy studio  `.trim()}"</p></div>
+    <div class="obj-section"><p class="obj-label">4. includes() — search match</p><p class="obj-value">"${r.title}".includes("Studio") → ${r.title.includes(`Studio`)}</p></div>
+    <div class="obj-section"><p class="obj-label">5. startsWith() — city prefix</p><p class="obj-value">"${r.city}".startsWith("La") → ${r.city.startsWith(`La`)}</p></div>
+    <div class="obj-section"><p class="obj-label">6. replace() — clean rent input</p><p class="obj-value">"18,000".replace(/[^0-9]/g,"") → ${"18,000".replace(/[^0-9]/g, ``)}</p></div>
+    <div class="obj-section"><p class="obj-label">7. split() — format date</p><p class="obj-value">"${r.createdAt}".split("-").reverse().join("/") → ${r.createdAt.split(`-`).reverse().join(`/`)}</p></div>
+    <div class="obj-section"><p class="obj-label">8. slice() — truncate title</p><p class="obj-value">"Luxury Apartment".slice(0,10) → "${"Luxury Apartment".slice(0, 10)}…"</p></div>
+    <div class="obj-section"><p class="obj-label">9. padStart() — pad rent</p><p class="obj-value">String(${r.rent}).padStart(8," ") → "${String(r.rent).padStart(8, ` `)}"</p></div>
+    <div class="obj-section"><p class="obj-label">10. charAt() — capitalize type</p><p class="obj-value">"${r.type}".charAt(0).toUpperCase() → "${r.type.charAt(0).toUpperCase()}"</p></div>
+  `;
+};
+
+const initApp = () => {
+  initTheme();
+  applyFilters();
+  renderStringPanel();
+  renderControlStructures();
+};
+
+const renderControlStructures = () => {
+  renderObjectPanel();
+  renderArrayPanel();
+};
+
+document.addEventListener(`DOMContentLoaded`, initApp);
+    </script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+
+</head>
+
+<body class="bg-gray-100 dark:bg-gray-950 text-gray-800 dark:text-gray-200 transition duration-300">
+    <nav
+        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800 fixed w-full z-50">
+        <div class="max-w-screen-xl mx-auto flex items-center justify-between p-4">
+            <a href="./index.html" class="text-2xl font-bold tracking-wide text-blue-600">RoomSync</a>
+            <div class="flex items-center space-x-8 font-medium">
+                <a href="./index.html" class="text-blue-600 font-semibold">Home</a>
+                <a href="./src/pages/about/about.html" class="hover:text-blue-600 transition">About</a>
+                <a href="./src/pages/contact/contact.html" class="hover:text-blue-600 transition">Contact</a>
+                <a href="./src/pages/sign-in/signin.html" class="hover:text-blue-600 transition">Sign In</a>
+                <a href="./src/pages/sign-up/signup.html"
+                    class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">Sign Up</a>
+                <button onclick="toggleTheme()"
+                    class="p-2 rounded-lg bg-gray-200 dark:bg-gray-800">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="h-20"></div>
+    <section class="relative bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-800 text-white py-20">
+        <div class="max-w-screen-xl mx-auto px-6 text-center">
+            <h1 class="text-5xl md:text-6xl font-extrabold leading-tight mb-6">Find Your Perfect <span
+                    class="text-yellow-300">Roommate</span></h1>
+            <p class="text-lg md:text-xl text-gray-200 mb-8 max-w-2xl mx-auto">A smarter, safer way to discover verified
+                rooms and compatible roommates.</p>
+            <div class="flex justify-center gap-6">
+                <a href="#"
+                    class="px-8 py-3 bg-white text-blue-700 font-semibold rounded-xl shadow-lg hover:scale-105 transition">Get
+                    Started</a>
+                <a href="#"
+                    class="px-8 py-3 border border-white rounded-xl hover:bg-white hover:text-blue-700 transition">Learn
+                    More</a>
+            </div>
+        </div>
+    </section>
+
+    <div class="max-w-screen-xl mx-auto px-6 py-12 space-y-16">
+        <div class="grid md:grid-cols-3 gap-10 text-center">
+            <div class="bg-white dark:bg-gray-900 p-10 rounded-2xl shadow-md hover:shadow-xl transition">
+                <h2 class="text-4xl font-bold text-blue-600">0</h2>
+                <p class="mt-3 text-gray-500">Verified Listings</p>
+            </div>
+            <div class="bg-white dark:bg-gray-900 p-10 rounded-2xl shadow-md hover:shadow-xl transition">
+                <h2 class="text-4xl font-bold text-blue-600">0</h2>
+                <p class="mt-3 text-gray-500">Happy Users</p>
+            </div>
+            <div class="bg-white dark:bg-gray-900 p-10 rounded-2xl shadow-md hover:shadow-xl transition">
+                <h2 class="text-4xl font-bold text-blue-600">0</h2>
+                <p class="mt-3 text-gray-500">Successful Matches</p>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="text-3xl font-bold text-center mb-8">Why Choose Us</h2>
+            <div class="grid md:grid-cols-3 gap-10">
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <h3 class="text-xl font-semibold mb-4">Smart Matching</h3>
+                    <p class="text-gray-500">AI-based compatibility system to match you with ideal roommates.</p>
+                </div>
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <h3 class="text-xl font-semibold mb-4">Verified Profiles</h3>
+                    <p class="text-gray-500">We verify users to ensure safety and authenticity.</p>
+                </div>
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <h3 class="text-xl font-semibold mb-4">Secure Messaging</h3>
+                    <p class="text-gray-500">Built-in private messaging system for safe communication.</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="text-3xl font-bold text-center mb-8">Explore Rooms</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <img class="rounded-2xl shadow-md hover:scale-105 transition duration-300"
+                    src="https://picsum.photos/400?1">
+                <img class="rounded-2xl shadow-md hover:scale-105 transition duration-300"
+                    src="https://picsum.photos/400?2">
+                <img class="rounded-2xl shadow-md hover:scale-105 transition duration-300"
+                    src="https://picsum.photos/400?3">
+                <img class="rounded-2xl shadow-md hover:scale-105 transition duration-300"
+                    src="https://picsum.photos/400?4">
+            </div>
+        </div>
+
+        <div>
+            <h2 class="text-3xl font-bold text-center mb-8">What Our Users Say</h2>
+            <div class="grid md:grid-cols-3 gap-10">
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <div class="text-yellow-400 mb-4 text-lg">★★★★★</div>
+                    <p class="text-gray-500 italic mb-6">"Found my perfect roommate within 3 days! The matching system
+                        is incredibly accurate."</p>
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-600">
+                            S</div>
+                        <div>
+                            <p class="font-semibold text-sm">Sara Ahmed</p>
+                            <p class="text-xs text-gray-400">Lahore</p>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <div class="text-yellow-400 mb-4 text-lg">★★★★★</div>
+                    <p class="text-gray-500 italic mb-6">"The verification process gave me so much confidence. I felt
+                        safe throughout."</p>
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-600">
+                            U</div>
+                        <div>
+                            <p class="font-semibold text-sm">Usman Raza</p>
+                            <p class="text-xs text-gray-400">Karachi</p>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    class="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow hover:-translate-y-2 hover:shadow-xl transition duration-300">
+                    <div class="text-yellow-400 mb-4 text-lg">★★★★☆</div>
+                    <p class="text-gray-500 italic mb-6">"Clean UI, easy to use, and the secure chat feature is a game
+                        changer for students."</p>
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-600">
+                            A</div>
+                        <div>
+                            <p class="font-semibold text-sm">Ayesha Khan</p>
+                            <p class="text-xs text-gray-400">Islamabad</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="alertBanner"
+            class="flex items-center gap-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-2xl p-6 shadow-sm">
+            <div
+                class="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl">
+                📣
+            </div>
+            <div class="flex-1">
+                <p class="font-semibold text-blue-700 dark:text-blue-300">New Feature — Instant Room Alerts!</p>
+                <p class="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                    Get notified the moment a new room matching your preferences is listed.
+                    <a href="./src/pages/sign-up/signup.html" class="underline font-semibold hover:text-blue-800">Sign
+                        up now→</a>
+                </p>
+            </div>
+            <button onclick="document.getElementById('alertBanner').style.display='none'"
+                class="text-blue-400 hover:text-blue-600 text-xl font-bold flex-shrink-0">✕</button>
+        </div>
+        <div class="border-l-4 border-indigo-600 pl-5 bg-indigo-50 dark:bg-indigo-950/20 rounded-r-xl py-4 pr-4">
+            <p class="text-sm font-bold uppercase tracking-wider text-indigo-600 mb-2">🔍 Search & Filter</p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Use the search bar or filter buttons to browse room listinfs.</p>
+        </div>
+        <input type="text" id="searchBar" oninput="applyFilters()" placeholder="🔍 Search by title or city..."
+            class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+
+        <!-- Filter buttons — 5 filters -->
+        <div class="flex flex-wrap gap-3">
+            <button onclick="setFilter('all')" id="f-all"
+                class="filter-btn active-filter px-4 py-2 rounded-xl text-sm font-semibold border border-blue-600 bg-blue-600 text-white transition">All</button>
+            <button onclick="setFilter('verified')" id="f-verified"
+                class="filter-btn px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 dark:border-gray-700 hover:border-blue-600 hover:text-blue-600 transition">✅
+                Verified Only</button>
+            <button onclick="setFilter('shared')" id="f-shared"
+                class="filter-btn px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 dark:border-gray-700 hover:border-blue-600 hover:text-blue-600 transition">🏠
+                Shared</button>
+            <button onclick="setFilter('private')" id="f-private"
+                class="filter-btn px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 dark:border-gray-700 hover:border-blue-600 hover:text-blue-600 transition">🔒
+                Private</button>
+            <button onclick="setFilter('studio')" id="f-studio"
+                class="filter-btn px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 dark:border-gray-700 hover:border-blue-600 hover:text-blue-600 transition">🏢
+                Studio</button>
+            <button onclick="setFilter('budget')" id="f-budget"
+                class="filter-btn px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 dark:border-gray-700 hover:border-blue-600 hover:text-blue-600 transition">💸
+                Under 15k</button>
+        </div>
+
+        <p id="resultsCount" class="text-sm text-gray-500"></p>
+
+        <div id="cardsGrid" class="grid md:grid-cols-3 gap-4"></div>
+
+        <div id="emptyState" class="hidden text-center py-12 text-gray-400">
+            <p class="text-4xl mb-3">🏠</p>
+            <p class="font-semibold">No listings found</p>
+            <p class="text-sm mt-1">Try a different search or filter</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700">
+            <h3 class="font-bold mb-5 text-base">Add New Room Listing</h3>
+            <div class="grid sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Title <span
+                            class="text-red-500">*</span></label>
+                    <input type="text" id="addTitle" placeholder="e.g. Cozy Studio"
+                        class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">City <span
+                            class="text-red-500">*</span></label>
+                    <select id="addCity"
+                        class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option value="" disabled selected>Select city</option>
+                        <option>Lahore</option>
+                        <option>Karachi</option>
+                        <option>Islamabad</option>
+                        <option>Rawalpindi</option>
+                        <option>Faisalabad</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Monthly Rent (PKR)
+                        <span class="text-red-500">*</span></label>
+                    <input type="number" id="addRent" placeholder="e.g. 15000"
+                        class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Room Type <span
+                            class="text-red-500">*</span></label>
+                    <select id="addType"
+                        class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option value="" disabled selected>Select type</option>
+                        <option>Shared</option>
+                        <option>Private</option>
+                        <option>Studio</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 mb-5">
+                <input type="checkbox" id="addVerified" class="w-4 h-4 accent-blue-600" />
+                <label for="addVerified" class="text-sm font-medium text-gray-600 dark:text-gray-400">Mark as
+                    Verified</label>
+            </div>
+            <p id="addError" class="hidden text-red-500 text-xs mb-3">⚠️ Please fill in all required fields.</p>
+            <button onclick="addRoom()"
+                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:scale-105 transition">
+                ➕ Add Listing
+            </button>
+        </div>
+
+    </div>
+</div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-10">
+            <h2 class="text-3xl font-bold text-center mb-4">Browse by Category</h2>
+            <p class="text-center text-gray-500 mb-8">Find exactly what you are looking for</p>
+            <div class="flex flex-wrap justify-center gap-4">
+                <span
+                    class="px-5 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full font-semibold hover:bg-blue-200 cursor-pointer transition">🏠
+                    Shared Rooms</span>
+                <span
+                    class="px-5 py-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full font-semibold hover:bg-green-200 cursor-pointer transition">✅
+                    Verified Only</span>
+                <span
+                    class="px-5 py-2 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full font-semibold hover:bg-yellow-200 cursor-pointer transition">⭐
+                    Top Rated</span>
+                <span
+                    class="px-5 py-2 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full font-semibold hover:bg-purple-200 cursor-pointer transition">🎓
+                    Student Friendly</span>
+                <span
+                    class="px-5 py-2 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full font-semibold hover:bg-red-200 cursor-pointer transition">🔥
+                    Trending</span>
+                <span
+                    class="px-5 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full font-semibold hover:bg-indigo-200 cursor-pointer transition">🐾
+                    Pet Friendly</span>
+                <span
+                    class="px-5 py-2 bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 rounded-full font-semibold hover:bg-pink-200 cursor-pointer transition">💼
+                    Working Professionals</span>
+                <span
+                    class="px-5 py-2 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full font-semibold hover:bg-orange-200 cursor-pointer transition">📍
+                    Near Universities</span>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-10">
+            <div class="max-w-2xl mx-auto text-center">
+                <h2 class="text-3xl font-bold mb-3">Stay in the Loop</h2>
+                <p class="text-gray-500 mb-8">Get the latest room listings and roommate tips delivered to your inbox.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <input type="email" placeholder="Enter your email address"
+                        class="flex-1 px-5 py-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <button
+                        class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">Subscribe</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-blue-600 text-white rounded-3xl p-16 text-center shadow-xl">
+            <h2 class="text-4xl font-bold mb-6">Ready to Find Your Match?</h2>
+            <p class="mb-8 text-lg">Join thousands of users finding their perfect living partner.</p>
+            <a href="#" class="px-8 py-3 bg-white text-blue-700 rounded-xl font-semibold hover:scale-105 transition">
+                Create Account
+            </a>
+        </div>
+
+    </div>
+
+    <footer class="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 py-10">
+        <div class="max-w-screen-xl mx-auto px-6 text-center">
+            <h3 class="text-xl font-semibold mb-4 text-blue-600">RoomSync</h3>
+            <p class="text-gray-500 mb-6">Connecting people with the perfect place and roommate.</p>
+            <div class="flex justify-center gap-8 mb-6">
+                <a href="#" class="hover:text-blue-600 transition">Privacy</a>
+                <a href="#" class="hover:text-blue-600 transition">Terms</a>
+                <a href="#" class="hover:text-blue-600 transition">Support</a>
+            </div>
+            <p class="text-sm text-gray-400">© 2026 RoomSync. Product of FYP.</p>
+        </div>
+    </footer>
+
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold mb-4">Edit Room Listing</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Title</label>
+                    <input type="text" id="editTitle" class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">City</label>
+                    <select id="editCity" class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option>Lahore</option>
+                        <option>Karachi</option>
+                        <option>Islamabad</option>
+                        <option>Rawalpindi</option>
+                        <option>Faisalabad</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Monthly Rent (PKR)</label>
+                    <input type="number" id="editRent" class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-semibold text-gray-600 dark:text-gray-400">Type</label>
+                    <select id="editType" class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option>Studio</option>
+                        <option>Shared</option>
+                        <option>Private</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="editVerified" class="w-4 h-4" />
+                    <label for="editVerified" class="text-sm font-semibold text-gray-600 dark:text-gray-400">Verified</label>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="updateRoom()" class="flex-1 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition">Update</button>
+                <button onclick="closeModal()" class="flex-1 py-2 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-400 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+    </script>
+</body>
+
+</html>
